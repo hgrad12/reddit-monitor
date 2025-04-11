@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"sort"
@@ -35,6 +36,7 @@ func NewSubReddit(subreddit string, pipe chan Result, client *reddit.Client, lim
 }
 
 func (s Subreddit) Read(sigChan chan os.Signal) {
+	var prev *Result
 	for {
 		select {
 			case <- sigChan:
@@ -51,10 +53,16 @@ func (s Subreddit) Read(sigChan chan os.Signal) {
 
 			var topPosts = ConvertPostsToResults(posts)
 
-			s.pipe <- Result{
+			current := &Result{
 				Name: s.subreddit, 
 				HotPosts: topPosts,
 				TopPosters: topUsers,
+			}
+
+			if prev == nil || !prev.Equals(current) {
+				s.logger.Info(fmt.Sprintf("%+v", current))
+				s.pipe <- *current
+				prev = current
 			}
 
 			//calculate rate limit
